@@ -1,19 +1,25 @@
 FROM ubuntu:18.04
+ENV TZ=Asia/Shanghai
+
 RUN sed -i "s@http://.*archive.ubuntu.com@http://repo.huaweicloud.com@g" /etc/apt/sources.list \
     && sed -i "s@http://.*security.ubuntu.com@http://repo.huaweicloud.com@g" /etc/apt/sources.list 
 
-RUN apt update \
+RUN echo "${TZ}" > /etc/timezone \
+    && ln -sf /usr/share/zoneinfo/${TZ} /etc/localtime \
+    && apt update \
     && apt install -y wget \
                     openssh-server \
                     vim \
-                    tmux \
-                    net-tools \
-                    git \
+                    tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && dpkg-reconfigure -f noninteractive tzdata \
+    && apt-get clean \
+    && apt-get autoclean \
     && echo 'root:root' | chpasswd \
-    && service ssh start
+    && echo "Port 233" >> /etc/ssh/sshd_config \
+    && echo "PermitRootLogin yes" >> /etc/ssh/sshd_config 
 
-ENV TimeZone=Asia/Shanghai
-# 使用软连接，并且将时区配置覆盖/etc/timezone
-RUN ln -snf /usr/share/zoneinfo/$TimeZone /etc/localtime && echo $TimeZone > /etc/timezone
+COPY startup_run.sh /root/
 
-CMD ["/usr/sbin/sshd","-D"]
+RUN chmod 777 /root/startup_run.sh \
+    && echo "# startup run \nif [ -f /root/startup_run.sh ]; then \n\t./root/startup_run.sh \nfi" >> /root/.bashrc
